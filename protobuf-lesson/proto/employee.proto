@@ -5,4 +5,10 @@ syntax = "proto3"; // syntaxの指定を忘れると、proto2が採用される
 /*
 comment1
 comment2
-*/            
+*/    
+
+message Employee {
+    int32 id = 1;
+    string name = 2;
+    string email = 3;
+}
