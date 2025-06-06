@@ -1,0 +1,8 @@
+syntax = "proto3"; // syntaxの指定を忘れると、proto2が採用される
+
+// comment
+
+/*
+comment1
+comment2
+*/            
