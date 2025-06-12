@@ -12,6 +12,12 @@ message Employee {
     string name = 2;
     string email = 3;
     Occupation occupation = 4;
+    repeated string phone_number = 5;
+    map<string, Project> project = 6;
+    oneof profile {
+        string text = 7;
+        Video video = 8;
+    }
 }
 
 enum Occupation {
@@ -20,3 +26,6 @@ enum Occupation {
     DESIGNER = 2;
     MANAGER = 3;
 }
+
+message Project {}
+message Video {}
