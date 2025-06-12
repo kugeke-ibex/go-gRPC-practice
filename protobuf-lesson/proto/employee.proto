@@ -13,7 +13,7 @@ message Employee {
     string email = 3;
     Occupation occupation = 4;
     repeated string phone_number = 5;
-    map<string, Project> project = 6;
+    map<string, Company.Project> project = 6;
     oneof profile {
         string text = 7;
         Video video = 8;
@@ -40,3 +40,7 @@ message Video {}
     map: {}
     oneof: null
  */
+
+ message Company {
+    message Project {}
+ }
