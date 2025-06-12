@@ -29,3 +29,14 @@ enum Occupation {
 
 message Project {}
 message Video {}
+
+// デフォルト値
+/**
+    string: ""
+    int32: 0
+    bool: false
+    enum: 0
+    repeated: []
+    map: {}
+    oneof: null
+ */
