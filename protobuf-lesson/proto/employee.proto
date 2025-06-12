@@ -1,5 +1,8 @@
 syntax = "proto3"; // syntaxの指定を忘れると、proto2が採用される
 
+package employee;
+
+import "protobuf-lesson/proto/date.proto";
 // comment
 
 /*
@@ -18,6 +21,7 @@ message Employee {
         string text = 7;
         Video video = 8;
     }
+    date.Date birthday = 9;
 }
 
 enum Occupation {
