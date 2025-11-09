@@ -41,8 +41,11 @@ func callListFiles(client pb.FileServiceClient) {
 }
 
 func callDownload(client pb.FileServiceClient) {
-	req := &pb.DownloadRequest{Filename: "hoge.txt"}
-	stream, err := client.Download(context.Background(), req)
+	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+	defer cancel()
+
+	req := &pb.DownloadRequest{Filename: "name.txt"}
+	stream, err := client.Download(ctx, req)
 	if err != nil {
 		log.Fatalf("Failed to call Download: %v", err)
 	}
@@ -56,6 +59,8 @@ func callDownload(client pb.FileServiceClient) {
 			if ok {
 				if resErr.Code() == codes.NotFound {
 					log.Fatalf("Error code: %v, Error Message: %v", resErr.Code(), resErr.Message())
+				} else if resErr.Code() == codes.DeadlineExceeded {
+					log.Fatalln("deadline exceeded")
 				} else {
 					log.Fatalf("Failed to receive data: %v", err)
 				}
