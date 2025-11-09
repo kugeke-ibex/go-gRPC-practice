@@ -21,7 +21,8 @@ func main() {
 	client := pb.NewFileServiceClient(conn)
 	// callListFiles(client)
 	// callDownload(client)
-	callUpload(client)
+	// callUpload(client)
+	callUploadAndNotifyProgress(client)
 }
 
 func callListFiles(client pb.FileServiceClient) {
@@ -90,4 +91,65 @@ func callUpload(client pb.FileServiceClient) {
 	}
 
 	log.Printf("Received data size: %v", res.GetSize())
+}
+
+func callUploadAndNotifyProgress(client pb.FileServiceClient) {
+	fileName := "sports.txt"
+	path := "/Users/kugeke/Development/Go/go-gRPC-practice/grpc-lesson/storage/" + fileName
+	
+	file, err := os.Open(path)
+	if err != nil {
+		log.Fatalf("Failed to open file: %v", err)
+	}
+	defer file.Close()
+
+	stream, err := client.UploadAndNotifyProgress(context.Background())
+	if err != nil {
+		log.Fatalf("Failed to call UploadAndNotifyProgress: %v", err)
+	}
+
+	// request 
+	buf := make([]byte, 5)
+	go func () {
+		for {
+			n, err := file.Read(buf)
+			if n == 0 || err == io.EOF {
+				break
+			}
+			if err != nil {
+				log.Fatalf("Failed to read file: %v", err)
+			}
+
+			req := &pb.UploadAndNotifyProgressRequest{Data: buf[:n]}
+			if sendErr := stream.Send(req); sendErr != nil {
+				log.Fatalf("Failed to send data: %v", sendErr)
+			}
+			time.Sleep(1 * time.Second)
+		}	
+
+		err := stream.CloseSend()
+		if err != nil {
+			log.Fatalf("Failed to close stream: %v", err)
+		}
+	}()
+
+	// backend
+	ch := make(chan struct{})
+	go func () {
+		for {
+			res, err := stream.Recv()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				log.Fatalf("Failed to receive data: %v", err)
+			}
+
+			log.Printf("Response fraom UploadAndNotifyProgress: %v", res.GetMsg())
+		}
+		close(ch)
+	}()
+	log.Println("Waiting for the response...")
+	<-ch
+	log.Println("Done")
 }
