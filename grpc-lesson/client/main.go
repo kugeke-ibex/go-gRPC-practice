@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -21,14 +23,14 @@ func main() {
 	defer conn.Close()
 
 	client := pb.NewFileServiceClient(conn)
-	callListFiles(client)
-	// callDownload(client)
+	// callListFiles(client)
+	callDownload(client)
 	// callUpload(client)
 	// callUploadAndNotifyProgress(client)
 }
 
 func callListFiles(client pb.FileServiceClient) {
-	md := metadata.New(map[string]string{"authorization": "Bearer test-token"})
+	md := metadata.New(map[string]string{"authorization": "Bearer bad-token"})
 	ctx := metadata.NewOutgoingContext(context.Background(), md)
 
 	res, err := client.ListFiles(ctx, &pb.ListFilesRequest{})
@@ -39,7 +41,7 @@ func callListFiles(client pb.FileServiceClient) {
 }
 
 func callDownload(client pb.FileServiceClient) {
-	req := &pb.DownloadRequest{Filename: "name.txt"}
+	req := &pb.DownloadRequest{Filename: "hoge.txt"}
 	stream, err := client.Download(context.Background(), req)
 	if err != nil {
 		log.Fatalf("Failed to call Download: %v", err)
@@ -50,7 +52,16 @@ func callDownload(client pb.FileServiceClient) {
 			break
 		}
 		if err != nil {
-			log.Fatalf("Failed to receive data: %v", err)
+			resErr, ok := status.FromError(err)
+			if ok {
+				if resErr.Code() == codes.NotFound {
+					log.Fatalf("Error code: %v, Error Message: %v", resErr.Code(), resErr.Message())
+				} else {
+					log.Fatalf("Failed to receive data: %v", err)
+				}
+			} else {
+				log.Fatalf("Failed to receive data: %v", err)
+			}
 		}
 
 		log.Printf("Response from Download(bytes): %v", res.GetData())

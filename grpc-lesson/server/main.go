@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"grpc-lesson/pb"
 	"io"
@@ -15,6 +14,8 @@ import (
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_auth "github.com/grpc-ecosystem/go-grpc-middleware/auth"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type server struct {
@@ -51,6 +52,11 @@ func (*server) Download(req *pb.DownloadRequest, stream pb.FileService_DownloadS
 	filename := req.GetFilename()
 	path := "/Users/kugeke/Development/Go/go-gRPC-practice/grpc-lesson/storage/" + filename
 	
+
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return status.Errorf(codes.NotFound, "file not found: %s", filename)
+	}
+
 	file, err := os.Open(path)
 	if err != nil {
 		return err
@@ -148,7 +154,7 @@ func authorize(ctx context.Context) (context.Context, error) {
 	}
 
 	if token != "test-token" {
-		return nil, errors.New("bad token")
+		return nil, status.Error(codes.Unauthenticated, "token is invalid")
 	}
 
 	return ctx, nil
