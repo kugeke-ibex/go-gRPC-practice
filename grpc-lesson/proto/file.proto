@@ -10,5 +10,5 @@ message ListFilesResponse {
 };
 
 service FileService {
-    rpc ListFiles(ListFilesRequest) return (ListFilesResponse);
+    rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
 }
