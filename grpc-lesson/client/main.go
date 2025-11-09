@@ -6,6 +6,7 @@ import (
 	"log"
 	"context"
 	"fmt"
+	"io"
 )
 
 func main() {
@@ -16,7 +17,8 @@ func main() {
 	defer conn.Close()
 
 	client := pb.NewFileServiceClient(conn)
-	callListFiles(client)
+	// callListFiles(client)
+	callDownload(client)
 }
 
 func callListFiles(client pb.FileServiceClient) {
@@ -25,4 +27,24 @@ func callListFiles(client pb.FileServiceClient) {
 		log.Fatalf("Failed to call ListFiles: %v", err)
 	}
 	fmt.Println(res.GetFilenames())
+}
+
+func callDownload(client pb.FileServiceClient) {
+	req := &pb.DownloadRequest{Filename: "name.txt"}
+	stream, err := client.Download(context.Background(), req)
+	if err != nil {
+		log.Fatalf("Failed to call Download: %v", err)
+	}
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatalf("Failed to receive data: %v", err)
+		}
+
+		log.Printf("Response from Download(bytes): %v", res.GetData())
+		log.Printf("Response from Download(string): %v", string(res.GetData()))
+	}
 }
