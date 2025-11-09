@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"time"
 )
 
 func main() {
@@ -18,7 +20,8 @@ func main() {
 
 	client := pb.NewFileServiceClient(conn)
 	// callListFiles(client)
-	callDownload(client)
+	// callDownload(client)
+	callUpload(client)
 }
 
 func callListFiles(client pb.FileServiceClient) {
@@ -47,4 +50,44 @@ func callDownload(client pb.FileServiceClient) {
 		log.Printf("Response from Download(bytes): %v", res.GetData())
 		log.Printf("Response from Download(string): %v", string(res.GetData()))
 	}
+}
+
+func callUpload(client pb.FileServiceClient) {
+	fileName := "sports.txt"
+	path := "/Users/kugeke/Development/Go/go-gRPC-practice/grpc-lesson/storage/" + fileName
+	
+	file, err := os.Open(path)
+	if err != nil {
+		log.Fatalf("Failed to open file: %v", err)
+	}
+	defer file.Close()
+
+	stream, err := client.Upload(context.Background())
+	if err != nil {
+		log.Fatalf("Failed to call Upload: %v", err)
+	}
+	for {
+		buf := make([]byte, 5)
+		n, err := file.Read(buf)
+		if n == 0 || err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatalf("Failed to read file: %v", err)
+		}
+
+		req := &pb.UploadRequest{Data: buf[:n]}
+		if sendErr := stream.Send(req); sendErr != nil {
+			log.Fatalf("Failed to send data: %v", sendErr)
+		}
+
+		time.Sleep(1 * time.Second)
+	}
+
+	res, err := stream.CloseAndRecv()
+	if err != nil {
+		log.Fatalf("Failed to close stream: %v", err)
+	}
+
+	log.Printf("Received data size: %v", res.GetSize())
 }
