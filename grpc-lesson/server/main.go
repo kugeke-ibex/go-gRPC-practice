@@ -14,7 +14,7 @@ type server struct {
 	pb.UnimplementedFileServiceServer
 }
 
-func (*server) Listfiles(ctx context.Context, req *pb.ListFilesRequest) (*pb.ListFilesResponse, error) {
+func (*server) ListFiles(ctx context.Context, req *pb.ListFilesRequest) (*pb.ListFilesResponse, error) {
 	fmt.Println("ListFiles was invoked")
 
 	dir := "/Users/kugeke/Development/Go/go-gRPC-practice/grpc-lesson/storage"
