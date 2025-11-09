@@ -2,13 +2,25 @@ syntax = "proto3"; // syntaxの指定を忘れると、proto2が採用される
 
 package employee;
 
-import "protobuf-lesson/proto/date.proto";
+option go_package = "./pb";
+
+import "proto/date.proto";
 // comment
 
 /*
 comment1
 comment2
 */    
+
+/**
+Tag
+・ フィールド名ではなく、タグ番号によって識別される
+・重複は許されず、一意である必要がある
+タグの最小値は1、最大値は2^29-1(536,870,911)
+・19000 〜 19999 は、protobufが予約しているタグ番号で使用不可
+・ 1 〜 15までは1バイトで表現可能なので、よく使うフィールドは1〜15に割り当てる(パフォーマンス向上)
+・連番にする必要がないので、あまり使わないタグ番号はあえて16以上にする
+*/
 
 message Employee {
     int32 id = 1;
