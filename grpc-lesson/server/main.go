@@ -15,6 +15,7 @@ import (
 	grpc_auth "github.com/grpc-ecosystem/go-grpc-middleware/auth"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 )
 
@@ -79,7 +80,7 @@ func (*server) Download(req *pb.DownloadRequest, stream pb.FileService_DownloadS
 		if sendErr := stream.Send(res); sendErr != nil {
 			return sendErr
 		}
-		time.Sleep(3 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 	return nil
 }
@@ -166,7 +167,17 @@ func main() {
 		log.Fatalf("Failed to listen: %v", err)
 	}
 
-	s := grpc.NewServer(grpc.UnaryInterceptor(
+	creds, err := credentials.NewServerTLSFromFile(
+		"ssl/localhost.pem", 
+		"ssl/localhost-key.pem",
+	)
+	if err != nil {
+		log.Fatalf("Failed to load TLS keys: %v", err)
+	}
+
+	s := grpc.NewServer(
+		grpc.Creds(creds),
+		grpc.UnaryInterceptor(
 		grpc_middleware.ChainUnaryServer(
 			myLogging(),
 			grpc_auth.UnaryServerInterceptor(authorize),
