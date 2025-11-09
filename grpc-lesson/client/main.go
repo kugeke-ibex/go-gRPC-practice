@@ -1,14 +1,16 @@
 package main
 
 import (
-	"google.golang.org/grpc"
-	"grpc-lesson/pb"
-	"log"
 	"context"
 	"fmt"
+	"grpc-lesson/pb"
 	"io"
+	"log"
 	"os"
 	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 func main() {
@@ -26,7 +28,10 @@ func main() {
 }
 
 func callListFiles(client pb.FileServiceClient) {
-	res, err := client.ListFiles(context.Background(), &pb.ListFilesRequest{})
+	md := metadata.New(map[string]string{"authorization": "Bearer test-token"})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
+
+	res, err := client.ListFiles(ctx, &pb.ListFilesRequest{})
 	if err != nil {
 		log.Fatalf("Failed to call ListFiles: %v", err)
 	}
@@ -56,7 +61,7 @@ func callDownload(client pb.FileServiceClient) {
 func callUpload(client pb.FileServiceClient) {
 	fileName := "sports.txt"
 	path := "/Users/kugeke/Development/Go/go-gRPC-practice/grpc-lesson/storage/" + fileName
-	
+
 	file, err := os.Open(path)
 	if err != nil {
 		log.Fatalf("Failed to open file: %v", err)
@@ -96,7 +101,7 @@ func callUpload(client pb.FileServiceClient) {
 func callUploadAndNotifyProgress(client pb.FileServiceClient) {
 	fileName := "sports.txt"
 	path := "/Users/kugeke/Development/Go/go-gRPC-practice/grpc-lesson/storage/" + fileName
-	
+
 	file, err := os.Open(path)
 	if err != nil {
 		log.Fatalf("Failed to open file: %v", err)
@@ -108,9 +113,9 @@ func callUploadAndNotifyProgress(client pb.FileServiceClient) {
 		log.Fatalf("Failed to call UploadAndNotifyProgress: %v", err)
 	}
 
-	// request 
+	// request
 	buf := make([]byte, 5)
-	go func () {
+	go func() {
 		for {
 			n, err := file.Read(buf)
 			if n == 0 || err == io.EOF {
@@ -125,7 +130,7 @@ func callUploadAndNotifyProgress(client pb.FileServiceClient) {
 				log.Fatalf("Failed to send data: %v", sendErr)
 			}
 			time.Sleep(1 * time.Second)
-		}	
+		}
 
 		err := stream.CloseSend()
 		if err != nil {
@@ -135,7 +140,7 @@ func callUploadAndNotifyProgress(client pb.FileServiceClient) {
 
 	// backend
 	ch := make(chan struct{})
-	go func () {
+	go func() {
 		for {
 			res, err := stream.Recv()
 			if err == io.EOF {
