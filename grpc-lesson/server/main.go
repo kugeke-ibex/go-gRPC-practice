@@ -24,9 +24,9 @@ type server struct {
 }
 
 func (*server) ListFiles(ctx context.Context, req *pb.ListFilesRequest) (*pb.ListFilesResponse, error) {
-	fmt.Println("ListFiles was invoked")
+	fmt.Println("========== [Unary] ListFiles invoked ==========")
 
-	dir := "/Users/kugeke/Development/Go/go-gRPC-practice/grpc-lesson/storage"
+	dir := "../storage"
 
 	paths, err := os.ReadDir(dir)
 	if err != nil {
@@ -39,7 +39,9 @@ func (*server) ListFiles(ctx context.Context, req *pb.ListFilesRequest) (*pb.Lis
 			filenames = append(filenames, path.Name())
 		}
 	}
-	
+
+	fmt.Printf("  → returning %d file(s): %v\n", len(filenames), filenames)
+
 	res := &pb.ListFilesResponse{
 		Filenames: filenames,
 	}
@@ -48,13 +50,14 @@ func (*server) ListFiles(ctx context.Context, req *pb.ListFilesRequest) (*pb.Lis
 }
 
 func (*server) Download(req *pb.DownloadRequest, stream pb.FileService_DownloadServer) error {
-	fmt.Println("Download was invoked")
+	fmt.Println("========== [Server Streaming] Download invoked ==========")
 
 	filename := req.GetFilename()
-	path := "/Users/kugeke/Development/Go/go-gRPC-practice/grpc-lesson/storage/" + filename
-	
+	path := "../storage/" + filename
+	fmt.Printf("Requested file: %s\n", filename)
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
+		fmt.Printf("  file not found: %s\n", filename)
 		return status.Errorf(codes.NotFound, "file not found: %s", filename)
 	}
 
@@ -65,10 +68,12 @@ func (*server) Download(req *pb.DownloadRequest, stream pb.FileService_DownloadS
 	defer file.Close()
 
 	buf := make([]byte, 5)
+	chunkIdx := 0
+	totalBytes := 0
 	for {
 		n, err := file.Read(buf)
-		if n == 0 || err == io.EOF{
-			break;
+		if n == 0 || err == io.EOF {
+			break
 		}
 		if err != nil {
 			return err
@@ -80,19 +85,26 @@ func (*server) Download(req *pb.DownloadRequest, stream pb.FileService_DownloadS
 		if sendErr := stream.Send(res); sendErr != nil {
 			return sendErr
 		}
+		chunkIdx++
+		totalBytes += n
+		fmt.Printf("  → sent chunk #%d (%d bytes): %q\n", chunkIdx, n, string(buf[:n]))
 		time.Sleep(1 * time.Second)
 	}
+	fmt.Printf("Download finished: %d chunk(s) / %d bytes\n", chunkIdx, totalBytes)
 	return nil
 }
 
 func (*server) Upload(stream pb.FileService_UploadServer) error {
-	fmt.Println("Upload was invoked")
+	fmt.Println("========== [Client Streaming] Upload invoked ==========")
 
 	var buf bytes.Buffer
-	
+	chunkIdx := 0
+
 	for {
 		req, err := stream.Recv()
 		if err == io.EOF {
+			fmt.Printf("Upload finished: received %d chunk(s) / %d bytes total\n", chunkIdx, buf.Len())
+			fmt.Printf("  → returning size: %d\n", buf.Len())
 			res := &pb.UploadResponse{
 				Size: int32(buf.Len()),
 			}
@@ -103,19 +115,21 @@ func (*server) Upload(stream pb.FileService_UploadServer) error {
 		}
 
 		data := req.GetData()
-		log.Printf("Received data (bytes): %v", data)
-		log.Printf("Received data (string): %v", string(data))
+		chunkIdx++
+		fmt.Printf("  ← received chunk #%d (%d bytes): %q\n", chunkIdx, len(data), string(data))
 		buf.Write(data)
 	}
 }
 
 func (*server) UploadAndNotifyProgress(stream pb.FileService_UploadAndNotifyProgressServer) error {
-	fmt.Println("UploadAndNotifyProgress was invoked")
+	fmt.Println("========== [Bidirectional Streaming] UploadAndNotifyProgress invoked ==========")
 
 	size := 0
+	chunkIdx := 0
 	for {
 		req, err := stream.Recv()
 		if err == io.EOF {
+			fmt.Printf("UploadAndNotifyProgress finished: received %d chunk(s) / %d bytes total\n", chunkIdx, size)
 			return nil
 		}
 		if err != nil {
@@ -123,27 +137,29 @@ func (*server) UploadAndNotifyProgress(stream pb.FileService_UploadAndNotifyProg
 		}
 
 		data := req.GetData()
-		log.Printf("Received data (bytes): %v", data)
+		chunkIdx++
 		size += len(data)
+		fmt.Printf("  ← received chunk #%d (%d bytes): %q\n", chunkIdx, len(data), string(data))
 
-		res := &pb.UploadAndNotifyProgressResponse{
-			Msg: fmt.Sprintf("Received %d bytes", size),
-		}
+		msg := fmt.Sprintf("Received %d bytes", size)
+		res := &pb.UploadAndNotifyProgressResponse{Msg: msg}
 		if sendErr := stream.Send(res); sendErr != nil {
 			return sendErr
 		}
+		fmt.Printf("  → [progress] %s\n", msg)
 	}
 }
 
-func myLogging() grpc.UnaryServerInterceptor { 
+func myLogging() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-		log.Printf("request data: %+v", req)
+		fmt.Printf("[interceptor] %s | request : %+v\n", info.FullMethod, req)
 
 		resp, err := handler(ctx, req)
 		if err != nil {
+			fmt.Printf("[interceptor] %s | error   : %v\n", info.FullMethod, err)
 			return nil, err
 		}
-		log.Printf("response data: %+v", resp)
+		fmt.Printf("[interceptor] %s | response: %+v\n", info.FullMethod, resp)
 		return resp, nil
 	}
 }

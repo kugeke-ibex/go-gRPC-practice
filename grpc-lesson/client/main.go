@@ -18,7 +18,7 @@ import (
 
 func main() {
 	// conn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
-	certFile := "/Users/kugeke/Library/Application Support/mkcert/rootCA.pem"
+	certFile := "ssl/rootCA.pem"
 	creds, err := credentials.NewClientTLSFromFile(certFile, "")
 	if err != nil {
 		log.Fatalf("Failed to load TLS credentials from %s: %v", certFile, err)
@@ -30,32 +30,47 @@ func main() {
 	defer conn.Close()
 
 	client := pb.NewFileServiceClient(conn)
-	// callListFiles(client)
-	callDownload(client)
+	callListFiles(client)
+	// callDownload(client)
 	// callUpload(client)
 	// callUploadAndNotifyProgress(client)
 }
 
 func callListFiles(client pb.FileServiceClient) {
-	md := metadata.New(map[string]string{"authorization": "Bearer bad-token"})
+	fmt.Println("========== [Unary] ListFiles ==========")
+
+	md := metadata.New(map[string]string{"authorization": "Bearer test-token"})
 	ctx := metadata.NewOutgoingContext(context.Background(), md)
 
 	res, err := client.ListFiles(ctx, &pb.ListFilesRequest{})
 	if err != nil {
 		log.Fatalf("Failed to call ListFiles: %v", err)
 	}
-	fmt.Println(res.GetFilenames())
+
+	filenames := res.GetFilenames()
+	fmt.Printf("Found %d file(s):\n", len(filenames))
+	for i, name := range filenames {
+		fmt.Printf("  [%d] %s\n", i+1, name)
+	}
 }
 
 func callDownload(client pb.FileServiceClient) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10 * time.Second)
+	fmt.Println("========== [Server Streaming] Download ==========")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	req := &pb.DownloadRequest{Filename: "name.txt"}
+	filename := "name.txt"
+	fmt.Printf("Requesting file: %s\n", filename)
+
+	req := &pb.DownloadRequest{Filename: filename}
 	stream, err := client.Download(ctx, req)
 	if err != nil {
 		log.Fatalf("Failed to call Download: %v", err)
 	}
+
+	chunkIdx := 0
+	totalBytes := 0
 	for {
 		res, err := stream.Recv()
 		if err == io.EOF {
@@ -76,14 +91,22 @@ func callDownload(client pb.FileServiceClient) {
 			}
 		}
 
-		log.Printf("Response from Download(bytes): %v", res.GetData())
-		log.Printf("Response from Download(string): %v", string(res.GetData()))
+		chunkIdx++
+		data := res.GetData()
+		totalBytes += len(data)
+		fmt.Printf("  chunk #%d (%d bytes)\n", chunkIdx, len(data))
+		fmt.Printf("    bytes : %v\n", data)
+		fmt.Printf("    string: %q\n", string(data))
 	}
+	fmt.Printf("Download finished: %d chunk(s), %d bytes total\n", chunkIdx, totalBytes)
 }
 
 func callUpload(client pb.FileServiceClient) {
+	fmt.Println("========== [Client Streaming] Upload ==========")
+
 	fileName := "sports.txt"
-	path := "/Users/kugeke/Development/Go/go-gRPC-practice/grpc-lesson/storage/" + fileName
+	path := "../storage/" + fileName
+	fmt.Printf("Uploading file: %s\n", fileName)
 
 	file, err := os.Open(path)
 	if err != nil {
@@ -95,6 +118,9 @@ func callUpload(client pb.FileServiceClient) {
 	if err != nil {
 		log.Fatalf("Failed to call Upload: %v", err)
 	}
+
+	chunkIdx := 0
+	sentBytes := 0
 	for {
 		buf := make([]byte, 5)
 		n, err := file.Read(buf)
@@ -109,6 +135,9 @@ func callUpload(client pb.FileServiceClient) {
 		if sendErr := stream.Send(req); sendErr != nil {
 			log.Fatalf("Failed to send data: %v", sendErr)
 		}
+		chunkIdx++
+		sentBytes += n
+		fmt.Printf("  → sent chunk #%d (%d bytes): %q\n", chunkIdx, n, string(buf[:n]))
 
 		time.Sleep(1 * time.Second)
 	}
@@ -118,12 +147,16 @@ func callUpload(client pb.FileServiceClient) {
 		log.Fatalf("Failed to close stream: %v", err)
 	}
 
-	log.Printf("Received data size: %v", res.GetSize())
+	fmt.Printf("Upload finished: sent %d chunk(s) / %d bytes\n", chunkIdx, sentBytes)
+	fmt.Printf("Server reported size: %d bytes\n", res.GetSize())
 }
 
 func callUploadAndNotifyProgress(client pb.FileServiceClient) {
+	fmt.Println("========== [Bidirectional Streaming] UploadAndNotifyProgress ==========")
+
 	fileName := "sports.txt"
-	path := "/Users/kugeke/Development/Go/go-gRPC-practice/grpc-lesson/storage/" + fileName
+	path := "../storage/" + fileName
+	fmt.Printf("Uploading file: %s\n", fileName)
 
 	file, err := os.Open(path)
 	if err != nil {
@@ -139,6 +172,7 @@ func callUploadAndNotifyProgress(client pb.FileServiceClient) {
 	// request
 	buf := make([]byte, 5)
 	go func() {
+		chunkIdx := 0
 		for {
 			n, err := file.Read(buf)
 			if n == 0 || err == io.EOF {
@@ -152,6 +186,8 @@ func callUploadAndNotifyProgress(client pb.FileServiceClient) {
 			if sendErr := stream.Send(req); sendErr != nil {
 				log.Fatalf("Failed to send data: %v", sendErr)
 			}
+			chunkIdx++
+			fmt.Printf("  → [send]     chunk #%d (%d bytes): %q\n", chunkIdx, n, string(buf[:n]))
 			time.Sleep(1 * time.Second)
 		}
 
@@ -173,11 +209,12 @@ func callUploadAndNotifyProgress(client pb.FileServiceClient) {
 				log.Fatalf("Failed to receive data: %v", err)
 			}
 
-			log.Printf("Response fraom UploadAndNotifyProgress: %v", res.GetMsg())
+			fmt.Printf("  ← [progress] %s\n", res.GetMsg())
 		}
 		close(ch)
 	}()
-	log.Println("Waiting for the response...")
+
+	fmt.Println("Waiting for progress notifications...")
 	<-ch
-	log.Println("Done")
+	fmt.Println("UploadAndNotifyProgress finished")
 }

@@ -2,12 +2,12 @@ package main
 
 import (
 	"log"
-	// "os"
+	"os"
 	"fmt"
 	"protobuf-lesson/pb"
 
-	"github.com/golang/protobuf/jsonpb"
-	// "google.golang.org/protobuf/proto"
+	// "google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 func main() {
@@ -30,40 +30,53 @@ func main() {
 		},
 	}
 
-	// binDate, err := proto.Marshal(employee)
-	// if err != nil {
-	// 	log.Fatalln("Can't serialize", err)
-	// }
+	binDate, err := proto.Marshal(employee)
+	if err != nil {
+		log.Fatalln("Can't serialize", err)
+	}
 
-	// if err := os.WriteFile("test.bin", binDate, 0644); err != nil {
-	// 	log.Fatalln("Can't write file", err)
-	// }
+	if err := os.WriteFile("test.bin", binDate, 0644); err != nil {
+		log.Fatalln("Can't write file", err)
+	}
 
-	// in, err :=  os.ReadFile("test.bin")
+	in, err := os.ReadFile("test.bin")
+	if err != nil {
+		log.Fatalln("Can't read file", err)
+	}
+
+	readEmployee := &pb.Employee{}
+	err = proto.Unmarshal(in, readEmployee)
+	if err != nil {
+		log.Fatalln("Can't deserialize", err)
+	}
+
+	fmt.Println("==================================================")
+	fmt.Println(" [Marshal]   Employee (struct) → binary")
+	fmt.Println("==================================================")
+	fmt.Printf("%d bytes: %x\n", len(binDate), binDate)
+	fmt.Println()
+	fmt.Println("==================================================")
+	fmt.Println(" [Unmarshal] binary → Employee (struct)")
+	fmt.Println("==================================================")
+	fmt.Println(readEmployee)
+
+	// out, err := protojson.Marshal(employee)
 	// if err != nil {
-	// 	log.Fatalln("Can't read file", err)
+	// 	log.Fatalln("Can't marshal to json", err)
 	// }
 
 	// readEmployee := &pb.Employee{}
-	// err = proto.Unmarshal(in, readEmployee)
-	// if err != nil {
-	// 	log.Fatalln("Can't deserialize", err)
+	// if err := protojson.Unmarshal(out, readEmployee); err != nil {
+	// 	log.Fatalln("Can't unmarshal from json", err)
 	// }
 
+	// fmt.Println("==================================================")
+	// fmt.Println(" [Marshal]   Employee (struct) → JSON string")
+	// fmt.Println("==================================================")
+	// fmt.Println(string(out))
+	// fmt.Println()
+	// fmt.Println("==================================================")
+	// fmt.Println(" [Unmarshal] JSON string → Employee (struct)")
+	// fmt.Println("==================================================")
 	// fmt.Println(readEmployee)
-
-	m := jsonpb.Marshaler{}
-	out, err := m.MarshalToString(employee)
-	if err != nil {
-		log.Fatalln("Can't marshal to json", err)
-	}
-
-	// fmt.Println(out)
-
-	readEmployee := &pb.Employee{}
-	if err := jsonpb.UnmarshalString(out, readEmployee); err != nil {
-		log.Fatalln("Can't unmarshal from json", err)
-	}
-
-	fmt.Println(readEmployee)
 }
